@@ -1,0 +1,72 @@
+name: 'Process SSH Connection'
+description: 'Process SSH connection details based on tag or branch'
+branding:
+  icon: 'terminal'
+  color: 'green'
+
+inputs:
+  ref:
+    description: 'Reference string to process (defaults to github.ref)'
+    required: false
+    default: ${{ github.ref }}
+  suffix_regex:
+    description: 'Regular expression to extract suffix from ref'
+    required: false
+    default: 'refs/(tags|heads)/.*-(.+)'
+  suffix_group:
+    description: 'Group number in regex that contains the suffix'
+    required: false
+    default: '2'
+
+outputs:
+  ssh_host:
+    description: 'Selected SSH host'
+    value: ${{ steps.process.outputs.ssh_host }}
+  ssh_username:
+    description: 'Selected SSH username'
+    value: ${{ steps.process.outputs.ssh_username }}
+  ssh_port:
+    description: 'Selected SSH port'
+    value: ${{ steps.process.outputs.ssh_port }}
+  environment:
+    description: 'Selected environment'
+    value: ${{ steps.process.outputs.environment }}
+  key:
+    description: 'Processed SSH key'
+    value: ${{ steps.process.outputs.key }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Process SSH connection
+      id: process
+      shell: bash
+      run: |
+        ref="${{ inputs.ref }}" # 使用传入的 ref，默认为 github.ref
+        suffix_regex="${{ inputs.suffix_regex }}"
+        suffix_group="${{ inputs.suffix_group }}"
+
+        if [[ "$ref" =~ $suffix_regex ]]; then
+          suffix="${BASH_REMATCH[$suffix_group]}"
+          suffix_upper=$(echo "$suffix" | tr '[:lower:]' '[:upper:]')
+          ssh_host_env="SSH_HOST_${suffix_upper}"
+          ssh_username_env="SSH_USERNAME_${suffix_upper}"
+          ssh_port_env="SSH_PORT_${suffix_upper}"
+          ssh_key_env="SSH_KEY_${suffix_upper}"
+
+          if [[ -n "${!ssh_host_env}" && -n "${!ssh_username_env}" && -n "${!ssh_port_env}" && -n "${!ssh_key_env}" ]]; then
+            echo "ssh_host=${!ssh_host_env}" >> $GITHUB_OUTPUT
+            echo "ssh_username=${!ssh_username_env}" >> $GITHUB_OUTPUT
+            echo "ssh_port=${!ssh_port_env}" >> $GITHUB_OUTPUT
+            echo "environment=${suffix}" >> $GITHUB_OUTPUT
+            echo "key<<EOF" >> $GITHUB_OUTPUT
+            echo "${!ssh_key_env}" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "Environment variables for suffix '$suffix_upper' are not set."
+            exit 1
+          fi
+        else
+          echo "No suffix found in ref: $ref using regex: $suffix_regex"
+          exit 1
+        fi
