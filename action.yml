@@ -23,24 +23,24 @@ inputs:
     default: '2'
 
 outputs:
-  ssh_host:
+  host:
     description: 'Selected SSH host'
     value: ${{ steps.process.outputs.ssh_host }}
-  ssh_username:
+  username:
     description: 'Selected SSH username'
     value: ${{ steps.process.outputs.ssh_username }}
-  ssh_port:
+  port:
     description: 'Selected SSH port'
     value: ${{ steps.process.outputs.ssh_port }}
+  key:
+    description: 'SSH key with processed line breaks'
+    value: ${{ steps.ssh_key.outputs.key }}
   environment:
     description: 'Selected environment'
     value: ${{ steps.process.outputs.environment }}
   environment_upper:
     description: 'Selected environment in uppercase'
     value: ${{ steps.process.outputs.environment_upper }}
-  key:
-    description: 'SSH key with processed line breaks'
-    value: ${{ steps.ssh_key.outputs.key }}
 
 runs:
   using: "composite"

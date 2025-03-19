@@ -17,18 +17,17 @@
 | `ref` | 要处理的引用字符串 | 否 | `${{ github.ref }}` |
 | `suffix_regex` | 从 ref 中提取后缀的正则表达式 | 否 | `'refs/(tags\|heads)/.*-(.+)'` |
 | `suffix_group` | 正则表达式中包含后缀的组号 | 否 | `'2'` |
-| `key_prefix` | 添加到 SSH key 名称前的前缀（优先于 key_prefix_environment） | 否 | `''` |
-| `key_prefix_environment` | 是否使用环境名作为 SSH key 名称的前缀（仅在 key_prefix 为空时使用） | 否 | `'false'` |
 
 ## 输出参数
 
 | 输出 | 描述 |
 |------|------|
-| `ssh_host` | 选定的 SSH 主机变量名 |
-| `ssh_username` | 选定的 SSH 用户名变量名 |
-| `ssh_port` | 选定的 SSH 端口变量名 |
-| `environment` | 选定的环境（小写后缀） |
+| `host` | 选定的 SSH 主机变量名 |
+| `username` | 选定的 SSH 用户名变量名 |
+| `port` | 选定的 SSH 端口变量名 |
 | `key` | 处理过换行符的 SSH 密钥 |
+| `environment` | 选定的环境（小写后缀） |
+| `environment_upper` | 选定的环境（大写后缀） |
 
 ## 所需的环境变量
 
@@ -45,7 +44,7 @@
 ### 1. 使用直接后缀
 
 ```yaml
-- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
   with:
     suffix: 'prod'
 ```
@@ -53,7 +52,7 @@
 ### 2. 使用正则表达式提取后缀
 
 ```yaml
-- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
   with:
     ref: 'refs/tags/release-prod'
     suffix_regex: 'refs/(tags|heads)/.*-(.+)'
@@ -77,19 +76,19 @@ jobs:
       - uses: actions/checkout@v3
 
       # 从 .env 文件加载环境变量
-      - name: Load Environment Variables
+      - name: 加载环境变量
         uses: ilaipi-freedom/load-env-action@v1.0.2
 
-      - name: 处理ssh连接信息
+      - name: 处理 SSH 连接
         id: ssh
-        uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+        uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
       
       - name: 使用 SSH 连接
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ env[steps.ssh.outputs.ssh_host] }}
-          username: ${{ env[steps.ssh.outputs.ssh_username] }}
-          port: ${{ env[steps.ssh.outputs.ssh_port] }}
+          host: ${{ env[steps.ssh.outputs.host] }}
+          username: ${{ env[steps.ssh.outputs.username] }}
+          port: ${{ env[steps.ssh.outputs.port] }}
           key: ${{ steps.ssh.outputs.key }}
           script: |
             echo "已连接到 ${{ steps.ssh.outputs.environment }} 环境！"
@@ -100,3 +99,4 @@ jobs:
 1. Action 会自动将后缀转换为大写形式来构建环境变量名。
 2. SSH 密钥的换行符（`\n`）会被自动处理。
 3. 使用此 Action 前请确保所有必需的环境变量都已设置。
+4. Action 同时输出环境名称的小写版本（`environment`）和大写版本（`environment_upper`）以提供更大的灵活性。

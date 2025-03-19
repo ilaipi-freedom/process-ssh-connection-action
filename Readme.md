@@ -22,11 +22,12 @@ This action processes SSH connection details based on tag or branch name. It hel
 
 | Output | Description |
 |--------|-------------|
-| `ssh_host` | Selected SSH host variable name |
-| `ssh_username` | Selected SSH username variable name |
-| `ssh_port` | Selected SSH port variable name |
-| `environment` | Selected environment (lowercase suffix) |
+| `host` | Selected SSH host variable name |
+| `username` | Selected SSH username variable name |
+| `port` | Selected SSH port variable name |
 | `key` | SSH key with processed line breaks |
+| `environment` | Selected environment (lowercase suffix) |
+| `environment_upper` | Selected environment in uppercase |
 
 ## Environment Variables Required
 
@@ -43,7 +44,7 @@ Where `{SUFFIX}` is the uppercase version of your environment suffix.
 ### 1. Using direct suffix
 
 ```yaml
-- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
   with:
     suffix: 'prod'
 ```
@@ -51,7 +52,7 @@ Where `{SUFFIX}` is the uppercase version of your environment suffix.
 ### 2. Using ref with regex extraction
 
 ```yaml
-- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
   with:
     ref: 'refs/tags/release-prod'
     suffix_regex: 'refs/(tags|heads)/.*-(.+)'
@@ -80,14 +81,14 @@ jobs:
 
       - name: Process SSH Connection
         id: ssh
-        uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
+        uses: ilaipi-freedom/process-ssh-connection-action@v1.0.5
       
       - name: Use SSH Connection
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ env[steps.ssh.outputs.ssh_host] }}
-          username: ${{ env[steps.ssh.outputs.ssh_username] }}
-          port: ${{ env[steps.ssh.outputs.ssh_port] }}
+          host: ${{ env[steps.ssh.outputs.host] }}
+          username: ${{ env[steps.ssh.outputs.username] }}
+          port: ${{ env[steps.ssh.outputs.port] }}
           key: ${{ steps.ssh.outputs.key }}
           script: |
             echo "Connected to ${{ steps.ssh.outputs.environment }} environment!"
@@ -98,3 +99,4 @@ jobs:
 1. The action will automatically convert the suffix to uppercase when constructing environment variable names.
 2. SSH key line breaks (`\n`) are automatically processed.
 3. Make sure all required environment variables are set before using this action.
+4. The action outputs both lowercase environment name (`environment`) and uppercase version (`environment_upper`) for flexibility.
