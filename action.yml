@@ -72,18 +72,18 @@ runs:
         ssh_port="SSH_PORT_${suffix_upper}"
         ssh_key="SSH_KEY_${suffix_upper}"
 
-        # 输出标准化的变量名
-        echo "ssh_host=$ssh_host" >> $GITHUB_OUTPUT
-        echo "ssh_username=$ssh_username" >> $GITHUB_OUTPUT
-        echo "ssh_port=$ssh_port" >> $GITHUB_OUTPUT
+        # 输出变量的值
+        echo "ssh_host=${!ssh_host}" >> $GITHUB_OUTPUT
+        echo "ssh_username=${!ssh_username}" >> $GITHUB_OUTPUT
+        echo "ssh_port=${!ssh_port}" >> $GITHUB_OUTPUT
         echo "environment=${suffix}" >> $GITHUB_OUTPUT
         echo "environment_upper=${suffix_upper}" >> $GITHUB_OUTPUT
-        echo "ssh_key_name=$ssh_key" >> $GITHUB_OUTPUT
+        echo "ssh_key=${!ssh_key}" >> $GITHUB_OUTPUT
 
     - name: Process SSH key
       id: ssh_key
       shell: bash
       run: |
         echo "key<<EOF" >> $GITHUB_OUTPUT
-        echo "${{ env[steps.process.outputs.ssh_key_name] }}" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
+        echo "${{ steps.process.outputs.ssh_key }}" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
