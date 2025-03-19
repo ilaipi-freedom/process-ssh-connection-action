@@ -35,9 +35,12 @@ outputs:
   environment:
     description: 'Selected environment'
     value: ${{ steps.process.outputs.environment }}
+  environment_upper:
+    description: 'Selected environment in uppercase'
+    value: ${{ steps.process.outputs.environment_upper }}
   key:
     description: 'SSH key with processed line breaks'
-    value: ${{ steps.process.outputs.key }}
+    value: ${{ steps.ssh_key.outputs.key }}
 
 runs:
   using: "composite"
@@ -74,9 +77,13 @@ runs:
         echo "ssh_username=$ssh_username" >> $GITHUB_OUTPUT
         echo "ssh_port=$ssh_port" >> $GITHUB_OUTPUT
         echo "environment=${suffix}" >> $GITHUB_OUTPUT
+        echo "environment_upper=${suffix_upper}" >> $GITHUB_OUTPUT
+        echo "ssh_key_name=$ssh_key" >> $GITHUB_OUTPUT
 
+    - name: Process SSH key
+      id: ssh_key
+      shell: bash
+      run: |
         echo "key<<EOF" >> $GITHUB_OUTPUT
-        # 从 env 上下文获取 key 内容并处理换行符
-        key_content="${{ env[format('SSH_KEY_{0}', suffix_upper)] }}"
-        echo "$key_content" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
+        echo "${{ env[steps.process.outputs.ssh_key_name] }}" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
