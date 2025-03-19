@@ -1,6 +1,13 @@
 # Process SSH Connection Action
 
-This action processes SSH connection details based on tag or branch name, with support for environment-specific configurations.
+This action processes SSH connection details based on tag or branch name. It helps standardize environment variable names for SSH connections.
+
+## Features
+
+- Extract environment suffix from ref or use direct input
+- Convert environment-specific variable names to standard outputs
+- Automatically process SSH key line breaks
+- Support for multiple environments (prod, staging, etc.)
 
 ## Inputs
 
@@ -10,18 +17,16 @@ This action processes SSH connection details based on tag or branch name, with s
 | `ref` | Reference string to process | false | `${{ github.ref }}` |
 | `suffix_regex` | Regular expression to extract suffix from ref | false | `'refs/(tags\|heads)/.*-(.+)'` |
 | `suffix_group` | Group number in regex that contains the suffix | false | `'2'` |
-| `key_prefix` | Prefix to add to the SSH key name (takes precedence over key_prefix_environment) | false | `''` |
-| `key_prefix_environment` | Whether to use environment as prefix for the SSH key name (only used if key_prefix is empty) | false | `'false'` |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `ssh_host` | Selected SSH host |
-| `ssh_username` | Selected SSH username |
-| `ssh_port` | Selected SSH port |
-| `environment` | Selected environment |
-| `key` | Processed SSH key (output as "key" or "{prefix}_key" or "{environment}_key") |
+| `ssh_host` | Selected SSH host variable name |
+| `ssh_username` | Selected SSH username variable name |
+| `ssh_port` | Selected SSH port variable name |
+| `environment` | Selected environment (lowercase suffix) |
+| `key` | SSH key with processed line breaks |
 
 ## Environment Variables Required
 
@@ -38,7 +43,7 @@ Where `{SUFFIX}` is the uppercase version of your environment suffix.
 ### 1. Using direct suffix
 
 ```yaml
-- uses: your-org/process-ssh-connection-action@v1
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
   with:
     suffix: 'prod'
 ```
@@ -46,29 +51,11 @@ Where `{SUFFIX}` is the uppercase version of your environment suffix.
 ### 2. Using ref with regex extraction
 
 ```yaml
-- uses: your-org/process-ssh-connection-action@v1
+- uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
   with:
     ref: 'refs/tags/release-prod'
     suffix_regex: 'refs/(tags|heads)/.*-(.+)'
     suffix_group: '2'
-```
-
-### 3. Using key prefix
-
-```yaml
-- uses: your-org/process-ssh-connection-action@v1
-  with:
-    suffix: 'prod'
-    key_prefix: 'myapp'  # Will output as myapp_key
-```
-
-### 4. Using environment as key prefix
-
-```yaml
-- uses: your-org/process-ssh-connection-action@v1
-  with:
-    suffix: 'prod'
-    key_prefix_environment: 'true'  # Will output as prod_key
 ```
 
 ## Complete Workflow Example
@@ -84,21 +71,30 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      SSH_HOST_PROD: "prod.example.com"
-      SSH_USERNAME_PROD: "deploy"
-      SSH_PORT_PROD: "22"
-      SSH_KEY_PROD: ${{ secrets.SSH_KEY_PROD }}
     steps:
-      - uses: your-org/process-ssh-connection-action@v1
+      - uses: actions/checkout@v3
+
+      # Load environment variables from .env file
+      - name: Load Environment Variables
+        uses: ilaipi-freedom/load-env-action@v1.0.2
+
+      - name: Process SSH Connection
         id: ssh
-        with:
-          key_prefix: 'myapp'  # Optional: adds prefix to key output
+        uses: ilaipi-freedom/process-ssh-connection-action@v1.0.2
       
       - name: Use SSH Connection
-        run: |
-          echo "Host: ${{ steps.ssh.outputs.ssh_host }}"
-          echo "Username: ${{ steps.ssh.outputs.ssh_username }}"
-          echo "Port: ${{ steps.ssh.outputs.ssh_port }}"
-          echo "Environment: ${{ steps.ssh.outputs.environment }}"
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ env[steps.ssh.outputs.ssh_host] }}
+          username: ${{ env[steps.ssh.outputs.ssh_username] }}
+          port: ${{ env[steps.ssh.outputs.ssh_port] }}
+          key: ${{ steps.ssh.outputs.key }}
+          script: |
+            echo "Connected to ${{ steps.ssh.outputs.environment }} environment!"
 ```
+
+## Notes
+
+1. The action will automatically convert the suffix to uppercase when constructing environment variable names.
+2. SSH key line breaks (`\n`) are automatically processed.
+3. Make sure all required environment variables are set before using this action.
