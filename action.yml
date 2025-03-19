@@ -5,6 +5,10 @@ branding:
   color: 'green'
 
 inputs:
+  suffix:
+    description: 'Direct suffix value to use (takes precedence over ref)'
+    required: false
+    default: ''
   ref:
     description: 'Reference string to process (defaults to github.ref)'
     required: false
@@ -17,6 +21,14 @@ inputs:
     description: 'Group number in regex that contains the suffix'
     required: false
     default: '2'
+  key_prefix:
+    description: 'Prefix to add to the SSH key name (takes precedence over key_prefix_environment)'
+    required: false
+    default: ''
+  key_prefix_environment:
+    description: 'Whether to use environment as prefix for the SSH key name (only used if key_prefix is empty)'
+    required: false
+    default: 'false'
 
 outputs:
   ssh_host:
@@ -32,8 +44,8 @@ outputs:
     description: 'Selected environment'
     value: ${{ steps.process.outputs.environment }}
   key:
-    description: 'Processed SSH key'
-    value: ${{ steps.process.outputs.key }}
+    description: 'Processed SSH key (output as "key" or "{prefix}_key" or "{environment}_key")'
+    value: ${{ steps.process.outputs[inputs.key_prefix != '' && format('{0}_key', inputs.key_prefix) || inputs.key_prefix_environment == 'true' && format('{0}_key', steps.process.outputs.environment) || 'key'] }}
 
 runs:
   using: "composite"
@@ -42,31 +54,51 @@ runs:
       id: process
       shell: bash
       run: |
-        ref="${{ inputs.ref }}" # 使用传入的 ref，默认为 github.ref
+        suffix="${{ inputs.suffix }}"
+        ref="${{ inputs.ref }}"
         suffix_regex="${{ inputs.suffix_regex }}"
         suffix_group="${{ inputs.suffix_group }}"
 
-        if [[ "$ref" =~ $suffix_regex ]]; then
+        if [[ -n "$suffix" ]]; then
+          # 如果直接提供了 suffix，使用它
+          suffix_upper=$(echo "$suffix" | tr '[:lower:]' '[:upper:]')
+        elif [[ "$ref" =~ $suffix_regex ]]; then
+          # 如果没有直接提供 suffix，从 ref 中提取
           suffix="${BASH_REMATCH[$suffix_group]}"
           suffix_upper=$(echo "$suffix" | tr '[:lower:]' '[:upper:]')
-          ssh_host_env="SSH_HOST_${suffix_upper}"
-          ssh_username_env="SSH_USERNAME_${suffix_upper}"
-          ssh_port_env="SSH_PORT_${suffix_upper}"
-          ssh_key_env="SSH_KEY_${suffix_upper}"
-
-          if [[ -n "${!ssh_host_env}" && -n "${!ssh_username_env}" && -n "${!ssh_port_env}" && -n "${!ssh_key_env}" ]]; then
-            echo "ssh_host=${!ssh_host_env}" >> $GITHUB_OUTPUT
-            echo "ssh_username=${!ssh_username_env}" >> $GITHUB_OUTPUT
-            echo "ssh_port=${!ssh_port_env}" >> $GITHUB_OUTPUT
-            echo "environment=${suffix}" >> $GITHUB_OUTPUT
-            echo "key<<EOF" >> $GITHUB_OUTPUT
-            echo "${!ssh_key_env}" | sed 's/\\n/\n/g' >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "Environment variables for suffix '$suffix_upper' are not set."
-            exit 1
-          fi
         else
-          echo "No suffix found in ref: $ref using regex: $suffix_regex"
+          echo "No suffix provided and no suffix found in ref: $ref using regex: $suffix_regex"
+          exit 1
+        fi
+
+        ssh_host_env="SSH_HOST_${suffix_upper}"
+        ssh_username_env="SSH_USERNAME_${suffix_upper}"
+        ssh_port_env="SSH_PORT_${suffix_upper}"
+        ssh_key_env="SSH_KEY_${suffix_upper}"
+
+        if [[ -n "${!ssh_host_env}" && -n "${!ssh_username_env}" && -n "${!ssh_port_env}" && -n "${!ssh_key_env}" ]]; then
+          echo "ssh_host=${!ssh_host_env}" >> $GITHUB_OUTPUT
+          echo "ssh_username=${!ssh_username_env}" >> $GITHUB_OUTPUT
+          echo "ssh_port=${!ssh_port_env}" >> $GITHUB_OUTPUT
+          echo "environment=${suffix}" >> $GITHUB_OUTPUT
+          
+          # 处理 key 的前缀
+          key_content=$(echo "${!ssh_key_env}" | sed 's/\\n/\n/g')
+          if [[ -n "${{ inputs.key_prefix }}" ]]; then
+            # 如果有 key_prefix，直接使用它作为前缀
+            echo "${{ inputs.key_prefix }}_key<<EOF" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.key_prefix_environment }}" == "true" ]]; then
+            # 如果 key_prefix_environment 为 true，使用 environment 作为前缀
+            echo "${suffix}_key<<EOF" >> $GITHUB_OUTPUT
+          else
+            # 不添加前缀
+            echo "key<<EOF" >> $GITHUB_OUTPUT
+          fi
+          
+          # 输出 key 内容
+          echo "${key_content}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "Required environment variables not set for suffix '$suffix_upper'"
           exit 1
         fi
