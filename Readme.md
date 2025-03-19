@@ -1,112 +1,104 @@
 # Process SSH Connection Action
 
-This GitHub Action allows you to dynamically select SSH connection configurations based on the suffix of a branch or tag. It is particularly useful when your GitHub Secrets contain multiple SSH connection details.
-
-## Purpose
-
-This Action's primary purpose is to:
-
-1.  **Extract Suffix:** Extract the suffix from `github.ref` or a user-specified string.
-2.  **Generate Environment Variable Names:** Dynamically generate SSH connection environment variable names based on the extracted suffix, such as `SSH_HOST_DEV`, `SSH_USERNAME_PROD`, etc.
-3.  **Retrieve Environment Variable Values:** Retrieve the values of the generated environment variables from GitHub Secrets.
-4.  **Set Outputs:** Set the SSH connection details (host, username, port, key) as outputs of the Action for use in subsequent steps.
-
-## Use Cases
-
-Use this Action when your GitHub Secrets contain multiple SSH connection details, and you want to dynamically select the SSH connection to use based on the suffix of a branch or tag.
-
-For example, if your Secrets contain the following environment variables:
-
-* `SSH_HOST_DEV`
-* `SSH_USERNAME_DEV`
-* `SSH_PORT_DEV`
-* `SSH_KEY_DEV`
-* `SSH_HOST_PROD`
-* `SSH_USERNAME_PROD`
-* `SSH_PORT_PROD`
-* `SSH_KEY_PROD`
-
-When your branch name is `feature-dev`, this Action will extract the `dev` suffix and use the values from the `SSH_*_DEV` environment variables. When your tag name is `release-prod`, it will extract the `prod` suffix and use the values from the `SSH_*_PROD` environment variables.
-
-## How to Use
-
-1.  **Add the Action to Your Workflow:**
-
-    ```yaml
-    jobs:
-      deploy:
-        runs-on: ubuntu-latest
-        steps:
-          - name: Checkout code
-            uses: actions/checkout@v3
-
-          - name: Process SSH connection
-            id: ssh_connection
-            uses: ilaipi-freedom/process-ssh-connection-action@v1 # Replace with your Action's path
-            with:
-              # ref: 'my-custom-ref' # Optional: Specify a custom ref string
-              # suffix_regex: 'your-custom-regex' # Optional: Specify a custom regex for suffix extraction
-              # suffix_group: '1' # Optional: Specify the capture group in the regex
-
-          - name: executing remote ssh commands using ssh key
-            uses: appleboy/ssh-action@v1.0.0
-            with:
-              host: ${{ steps.ssh_connection.outputs.ssh_host }}
-              username: ${{ steps.ssh_connection.outputs.ssh_username }}
-              key: ${{ steps.ssh_connection.outputs.key }}
-              port: ${{ steps.ssh_connection.outputs.ssh_port }}
-              script: |
-                # your remote commands here
-                echo "Connected via SSH!"
-    ```
-
-2.  **Set GitHub Secrets:**
-
-    In your GitHub repository settings, add Secrets containing the SSH connection details, named according to the following format:
-
-    * `SSH_HOST_<SUFFIX>`
-    * `SSH_USERNAME_<SUFFIX>`
-    * `SSH_PORT_<SUFFIX>`
-    * `SSH_KEY_<SUFFIX>`
-
-    Where `<SUFFIX>` is the uppercase form of the extracted suffix from the branch or tag name.
+This action processes SSH connection details based on tag or branch name, with support for environment-specific configurations.
 
 ## Inputs
 
-| Name           | Description                                                                     | Default                     | Required |
-| :------------- | :------------------------------------------------------------------------------ | :-------------------------- | :------- |
-| `ref`          | Reference string to process (defaults to `github.ref`)                          | `${{ github.ref }}`         | No       |
-| `suffix_regex` | Regular expression to extract the suffix                                        | `refs/(tags\|heads)/.*-(.+)` | No       |
-| `suffix_group` | Group number in the regex that contains the suffix                              | `2`                         | No       |
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `suffix` | Direct suffix value to use (takes precedence over ref) | false | `''` |
+| `ref` | Reference string to process | false | `${{ github.ref }}` |
+| `suffix_regex` | Regular expression to extract suffix from ref | false | `'refs/(tags\|heads)/.*-(.+)'` |
+| `suffix_group` | Group number in regex that contains the suffix | false | `'2'` |
+| `key_prefix` | Prefix to add to the SSH key name (takes precedence over key_prefix_environment) | false | `''` |
+| `key_prefix_environment` | Whether to use environment as prefix for the SSH key name (only used if key_prefix is empty) | false | `'false'` |
 
 ## Outputs
 
-| Name          | Description                  |
-| :------------ | :--------------------------- |
-| `ssh_host`    | SSH host name                |
-| `ssh_username`| SSH username                 |
-| `ssh_port`    | SSH port number              |
-| `environment` | Extracted environment name   |
-| `key`         | SSH private key content      |
+| Output | Description |
+|--------|-------------|
+| `ssh_host` | Selected SSH host |
+| `ssh_username` | Selected SSH username |
+| `ssh_port` | Selected SSH port |
+| `environment` | Selected environment |
+| `key` | Processed SSH key (output as "key" or "{prefix}_key" or "{environment}_key") |
 
-## Example
+## Environment Variables Required
 
-Assuming your branch name is `feature-dev` and your Secrets contain the following environment variables:
+For each environment (suffix), you need to set these environment variables:
+- `SSH_HOST_{SUFFIX}`
+- `SSH_USERNAME_{SUFFIX}`
+- `SSH_PORT_{SUFFIX}`
+- `SSH_KEY_{SUFFIX}`
 
-* `SSH_HOST_DEV=dev.example.com`
-* `SSH_USERNAME_DEV=user`
-* `SSH_PORT_DEV=22`
-* `SSH_KEY_DEV=-----BEGIN RSA PRIVATE KEY-----...-----END RSA PRIVATE KEY-----`
+Where `{SUFFIX}` is the uppercase version of your environment suffix.
 
-Then the Action's outputs will be:
+## Usage Examples
 
-* `ssh_host=dev.example.com`
-* `ssh_username=user`
-* `ssh_port=22`
-* `environment=dev`
-* `key=-----BEGIN RSA PRIVATE KEY-----...-----END RSA PRIVATE KEY-----`
+### 1. Using direct suffix
 
-## Notes
+```yaml
+- uses: your-org/process-ssh-connection-action@v1
+  with:
+    suffix: 'prod'
+```
 
-* Ensure your GitHub Secrets contain all the required SSH connection details with the correct naming.
-* If your branch or tag names do not conform to the default suffix extraction rules, use the `suffix_regex` input to provide a custom regular expression.
+### 2. Using ref with regex extraction
+
+```yaml
+- uses: your-org/process-ssh-connection-action@v1
+  with:
+    ref: 'refs/tags/release-prod'
+    suffix_regex: 'refs/(tags|heads)/.*-(.+)'
+    suffix_group: '2'
+```
+
+### 3. Using key prefix
+
+```yaml
+- uses: your-org/process-ssh-connection-action@v1
+  with:
+    suffix: 'prod'
+    key_prefix: 'myapp'  # Will output as myapp_key
+```
+
+### 4. Using environment as key prefix
+
+```yaml
+- uses: your-org/process-ssh-connection-action@v1
+  with:
+    suffix: 'prod'
+    key_prefix_environment: 'true'  # Will output as prod_key
+```
+
+## Complete Workflow Example
+
+```yaml
+name: Deploy
+on:
+  push:
+    tags:
+      - '*-prod'
+      - '*-staging'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST_PROD: "prod.example.com"
+      SSH_USERNAME_PROD: "deploy"
+      SSH_PORT_PROD: "22"
+      SSH_KEY_PROD: ${{ secrets.SSH_KEY_PROD }}
+    steps:
+      - uses: your-org/process-ssh-connection-action@v1
+        id: ssh
+        with:
+          key_prefix: 'myapp'  # Optional: adds prefix to key output
+      
+      - name: Use SSH Connection
+        run: |
+          echo "Host: ${{ steps.ssh.outputs.ssh_host }}"
+          echo "Username: ${{ steps.ssh.outputs.ssh_username }}"
+          echo "Port: ${{ steps.ssh.outputs.ssh_port }}"
+          echo "Environment: ${{ steps.ssh.outputs.environment }}"
+```
